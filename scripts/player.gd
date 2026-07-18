@@ -51,9 +51,15 @@ var score: int = 0
 var current_energy: float = 0.0
 var is_game_over: bool = false
 var web_audio_unlocked: bool = false
+var web_audio_probe_played: bool = false
+var web_audio_probe_player: AudioStreamPlayer = null
 
 func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+	if AudioServer.get_bus_count() > 0:
+		AudioServer.set_bus_mute(0, false)
+		if AudioServer.get_bus_volume_db(0) < -20.0:
+			AudioServer.set_bus_volume_db(0, 0.0)
 	spawn_position = global_position
 	current_health = max_health
 	current_energy = max_energy
@@ -82,6 +88,11 @@ func _ready() -> void:
 		walking_audio.stream = walking_stream
 		if walking_audio.stream is AudioStreamOggVorbis:
 			(walking_audio.stream as AudioStreamOggVorbis).loop = true
+
+	web_audio_probe_player = AudioStreamPlayer.new()
+	web_audio_probe_player.name = "WebAudioProbe"
+	web_audio_probe_player.volume_db = -6.0
+	add_child(web_audio_probe_player)
 
 
 func load_audio_stream(path: String) -> AudioStream:
@@ -183,6 +194,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func try_unlock_web_audio(event: InputEvent) -> void:
 	if web_audio_unlocked:
+		if OS.has_feature("web") and not web_audio_probe_played and is_instance_valid(web_audio_probe_player):
+			play_synth_on_player_2d(web_audio_probe_player, 0.08, 640.0, 0.22)
+			web_audio_probe_played = true
 		return
 	if not OS.has_feature("web"):
 		web_audio_unlocked = true
@@ -197,25 +211,10 @@ func try_unlock_web_audio(event: InputEvent) -> void:
 	if not is_user_gesture:
 		return
 
-	# Some browsers keep WebAudio suspended until explicit interaction.
-	JavaScriptBridge.eval("""
-		(() => {
-			const Ctor = window.AudioContext || window.webkitAudioContext;
-			if (!Ctor) return;
-			const ctx = window.__godotAudioUnlockCtx || new Ctor();
-			window.__godotAudioUnlockCtx = ctx;
-			if (ctx.state === 'suspended') {
-				ctx.resume();
-			}
-			const osc = ctx.createOscillator();
-			const gain = ctx.createGain();
-			gain.gain.value = 0.0001;
-			osc.connect(gain);
-			gain.connect(ctx.destination);
-			osc.start();
-			osc.stop(ctx.currentTime + 0.02);
-		})();
-	""")
+	# Trigger a tiny Godot-side beep on first user gesture to unlock audio output.
+	if is_instance_valid(web_audio_probe_player):
+		play_synth_on_player_2d(web_audio_probe_player, 0.08, 640.0, 0.22)
+		web_audio_probe_played = true
 
 	web_audio_unlocked = true
 

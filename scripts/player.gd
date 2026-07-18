@@ -122,6 +122,7 @@ func play_ouch_sound() -> void:
 	if ouch_audio.stream == null:
 		ouch_audio.stream = load_audio_stream(OUCH_STREAM_PATH)
 		if ouch_audio.stream == null:
+			play_synth_on_player_2d(ouch_audio, 0.12, 210.0, 0.24)
 			return
 		
 	ouch_audio.pitch_scale = randf_range(0.97, 1.03)
@@ -370,6 +371,7 @@ func play_shot_sound() -> void:
 	if gun_shot_audio.stream == null:
 		gun_shot_audio.stream = load_audio_stream(GUNSHOT_STREAM_PATH)
 		if gun_shot_audio.stream == null:
+			play_synth_on_player_3d(gun_shot_audio, 0.11, 175.0, 0.26)
 			return
 	gun_shot_audio.pitch_scale = randf_range(0.98, 1.03)
 	gun_shot_audio.volume_db = -2.0
@@ -382,10 +384,59 @@ func play_reload_sound() -> void:
 	if reload_audio.stream == null:
 		reload_audio.stream = load_audio_stream(RELOAD_STREAM_PATH)
 		if reload_audio.stream == null:
+			play_synth_on_player_3d(reload_audio, 0.18, 125.0, 0.2)
 			return
 	reload_audio.pitch_scale = randf_range(0.98, 1.02)
 	reload_audio.volume_db = -4.0
 	reload_audio.play()
+
+
+func play_synth_on_player_2d(player: AudioStreamPlayer, duration: float, frequency: float, gain: float) -> void:
+	if not is_instance_valid(player):
+		return
+
+	var stream := AudioStreamGenerator.new()
+	stream.mix_rate = 32000.0
+	stream.buffer_length = maxf(duration + 0.03, 0.08)
+	player.stream = stream
+	player.play()
+
+	var playback := player.get_stream_playback() as AudioStreamGeneratorPlayback
+	if playback == null:
+		return
+
+	var sample_count: int = int(stream.mix_rate * duration)
+	for i in range(sample_count):
+		var t: float = float(i) / stream.mix_rate
+		var envelope: float = exp(-8.0 * t)
+		var tone: float = sin(TAU * frequency * t)
+		var noise: float = randf_range(-1.0, 1.0) * 0.12
+		var sample: float = clampf((tone * 0.75 + noise) * envelope * gain, -1.0, 1.0)
+		playback.push_frame(Vector2(sample, sample))
+
+
+func play_synth_on_player_3d(player: AudioStreamPlayer3D, duration: float, frequency: float, gain: float) -> void:
+	if not is_instance_valid(player):
+		return
+
+	var stream := AudioStreamGenerator.new()
+	stream.mix_rate = 32000.0
+	stream.buffer_length = maxf(duration + 0.03, 0.08)
+	player.stream = stream
+	player.play()
+
+	var playback := player.get_stream_playback() as AudioStreamGeneratorPlayback
+	if playback == null:
+		return
+
+	var sample_count: int = int(stream.mix_rate * duration)
+	for i in range(sample_count):
+		var t: float = float(i) / stream.mix_rate
+		var envelope: float = exp(-8.0 * t)
+		var tone: float = sin(TAU * frequency * t)
+		var noise: float = randf_range(-1.0, 1.0) * 0.12
+		var sample: float = clampf((tone * 0.75 + noise) * envelope * gain, -1.0, 1.0)
+		playback.push_frame(Vector2(sample, sample))
 
 
 func spawn_impact_marker(hit_position: Vector3, hit_normal: Vector3) -> void:

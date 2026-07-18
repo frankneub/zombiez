@@ -26,6 +26,7 @@ jobs:
         uses: actions/configure-pages@v5
 
       - name: Export Godot Web build
+        id: export
         uses: firebelley/godot-export@v6.0.0
         with:
           godot_executable_download_url: https://github.com/godotengine/godot/releases/download/4.7-stable/Godot_v4.7-stable_linux.x86_64.zip
@@ -34,15 +35,32 @@ jobs:
           archive_output: false
           presets_to_export: Web
 
+      - name: Resolve web export directory
+        run: |
+          CANDIDATE="${{ steps.export.outputs.build_directory }}/Web"
+          if [ -n "${{ steps.export.outputs.build_directory }}" ] && [ -d "$CANDIDATE" ]; then
+            echo "WEB_BUILD_DIR=$CANDIDATE" >> "$GITHUB_ENV"
+          elif [ -d "build/Web" ]; then
+            echo "WEB_BUILD_DIR=build/Web" >> "$GITHUB_ENV"
+          elif [ -d ".godot/build/Web" ]; then
+            echo "WEB_BUILD_DIR=.godot/build/Web" >> "$GITHUB_ENV"
+          else
+            echo "Could not find exported Web directory."
+            echo "build_directory output: '${{ steps.export.outputs.build_directory }}'"
+            find . -maxdepth 6 -type f -name index.html | sed -n '1,40p'
+            exit 1
+          fi
+
       - name: Verify web export output
         run: |
-          ls -la build/Web
-          test -f build/Web/index.html
+          echo "Using WEB_BUILD_DIR=$WEB_BUILD_DIR"
+          ls -la "$WEB_BUILD_DIR"
+          test -f "$WEB_BUILD_DIR/index.html"
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: build/Web
+          path: ${{ env.WEB_BUILD_DIR }}
 
   deploy:
     runs-on: ubuntu-latest

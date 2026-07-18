@@ -1,0 +1,391 @@
+[gd_scene load_steps=31 format=3]
+
+[ext_resource type="Script" path="res://scripts/player.gd" id="1_player"]
+[ext_resource type="Script" path="res://scripts/enemy_target.gd" id="2_enemy"]
+[ext_resource type="Texture2D" path="res://assets/checker_tile.svg" id="2_checker"]
+[ext_resource type="Script" path="res://scripts/zombie_wave_spawner.gd" id="3_wave_spawner"]
+[ext_resource type="PackedScene" path="res://scenes/Zombie.tscn" id="4_zombie_scene"]
+[ext_resource type="Script" path="res://scripts/day_night_cycle.gd" id="5_day_night"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ground"]
+size = Vector3(100, 0.2, 100)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_ground"]
+size = Vector2(100, 100)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ground"]
+albedo_texture = ExtResource("2_checker")
+metallic = 0.85
+roughness = 0.08
+uv1_scale = Vector3(50, 50, 1)
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_player"]
+radius = 0.4
+height = 1.2
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_sunset"]
+sky_top_color = Color(0.2, 0.55, 0.95, 1)
+sky_horizon_color = Color(0.98, 0.55, 0.32, 1)
+ground_bottom_color = Color(0.05, 0.04, 0.06, 1)
+ground_horizon_color = Color(0.32, 0.3, 0.34, 1)
+sun_angle_max = 18.0
+sun_curve = 0.12
+
+[sub_resource type="Sky" id="Sky_sunset"]
+sky_material = SubResource("ProceduralSkyMaterial_sunset")
+
+[sub_resource type="Environment" id="Environment_world"]
+background_mode = 2
+sky = SubResource("Sky_sunset")
+ambient_light_source = 3
+glow_enabled = true
+glow_strength = 0.4
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gun"]
+albedo_color = Color(0.09, 0.09, 0.1, 1)
+metallic = 0.85
+roughness = 0.18
+
+[sub_resource type="BoxMesh" id="BoxMesh_gun_body"]
+size = Vector3(0.16, 0.1, 0.32)
+
+[sub_resource type="BoxMesh" id="BoxMesh_gun_barrel"]
+size = Vector3(0.05, 0.04, 0.2)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gun_polymer"]
+albedo_color = Color(0.03, 0.03, 0.035, 1)
+metallic = 0.12
+roughness = 0.65
+
+[sub_resource type="BoxMesh" id="BoxMesh_gun_grip"]
+size = Vector3(0.11, 0.17, 0.1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_gun_slide"]
+size = Vector3(0.13, 0.065, 0.25)
+
+[sub_resource type="BoxMesh" id="BoxMesh_gun_sight"]
+size = Vector3(0.025, 0.018, 0.03)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_enemy"]
+albedo_color = Color(0.78, 0.16, 0.14, 1)
+metallic = 0.08
+roughness = 0.35
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_enemy_body"]
+radius = 0.35
+mid_height = 0.95
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_enemy_body"]
+radius = 0.35
+height = 1.7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_sun_visual"]
+shading_mode = 0
+albedo_color = Color(1, 0.84, 0.56, 1)
+emission_enabled = true
+emission = Color(1, 0.82, 0.52, 1)
+emission_energy_multiplier = 3.5
+disable_receive_shadows = true
+
+[sub_resource type="SphereMesh" id="SphereMesh_sun_visual"]
+radius = 7.0
+height = 14.0
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_boundary_long"]
+size = Vector3(100, 8, 2)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_boundary_wide"]
+size = Vector3(2, 8, 100)
+
+[sub_resource type="Shader" id="Shader_star_field"]
+code = "shader_type spatial;\nrender_mode unshaded, cull_front, depth_draw_never, blend_add, fog_disabled;\n\nuniform float star_visibility : hint_range(0.0, 1.0) = 0.0;\nuniform vec3 star_color : source_color = vec3(0.9, 0.95, 1.0);\nuniform float star_brightness : hint_range(0.0, 8.0) = 3.8;\nuniform float star_density = 950.0;\nuniform float star_threshold = 0.9975;\n\nfloat hash(vec2 p) {\n\treturn fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);\n}\n\nvoid fragment() {\n\tvec2 grid = UV * star_density;\n\tvec2 cell = floor(grid);\n\tfloat h = hash(cell);\n\tfloat star = step(star_threshold, h);\n\tfloat twinkle = 0.72 + 0.28 * sin(TIME * (1.8 + h * 4.0) + h * 42.0);\n\tfloat intensity = star * twinkle * star_visibility * star_brightness;\n\tALBEDO = vec3(0.0);\n\tEMISSION = star_color * intensity;\n\tALPHA = clamp(intensity, 0.0, 1.0);\n}\n"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_star_field"]
+shader = SubResource("Shader_star_field")
+
+[sub_resource type="SphereMesh" id="SphereMesh_star_field"]
+radius = 240.0
+height = 480.0
+radial_segments = 96
+rings = 48
+
+[node name="Main" type="Node3D"]
+
+[node name="DayNightCycle" type="Node3D" parent="."]
+script = ExtResource("5_day_night")
+daylight_duration_seconds = 300.0
+night_duration_seconds = 300.0
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_world")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.939693, -0.241845, 0.241845, 0, 0.707107, 0.707107, -0.34202, -0.664463, 0.664463, 0, 8, 0)
+light_energy = 1.2
+light_color = Color(1, 0.78, 0.62, 1)
+shadow_enabled = true
+
+[node name="SunVisual" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 90, -180)
+cast_shadow = 0
+mesh = SubResource("SphereMesh_sun_visual")
+material_override = SubResource("StandardMaterial3D_sun_visual")
+
+[node name="StarField" type="MeshInstance3D" parent="."]
+cast_shadow = 0
+mesh = SubResource("SphereMesh_star_field")
+material_override = SubResource("ShaderMaterial_star_field")
+
+[node name="Ground" type="StaticBody3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ground"]
+shape = SubResource("BoxShape3D_ground")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Ground"]
+mesh = SubResource("PlaneMesh_ground")
+material_override = SubResource("StandardMaterial3D_ground")
+
+[node name="Boundaries" type="Node3D" parent="."]
+
+[node name="NorthWall" type="StaticBody3D" parent="Boundaries"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.9, -50)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Boundaries/NorthWall"]
+shape = SubResource("BoxShape3D_boundary_long")
+
+[node name="SouthWall" type="StaticBody3D" parent="Boundaries"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.9, 50)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Boundaries/SouthWall"]
+shape = SubResource("BoxShape3D_boundary_long")
+
+[node name="EastWall" type="StaticBody3D" parent="Boundaries"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, 3.9, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Boundaries/EastWall"]
+shape = SubResource("BoxShape3D_boundary_wide")
+
+[node name="WestWall" type="StaticBody3D" parent="Boundaries"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -50, 3.9, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Boundaries/WestWall"]
+shape = SubResource("BoxShape3D_boundary_wide")
+
+[node name="Enemies" type="Node3D" parent="."]
+
+[node name="SpawnPoints" type="Node3D" parent="."]
+
+[node name="SpawnA" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -24, 0, -12)
+
+[node name="SpawnB" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -18, 0, -42)
+
+[node name="SpawnC" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -48)
+
+[node name="SpawnD" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18, 0, -42)
+
+[node name="SpawnE" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24, 0, -12)
+
+[node name="SpawnF" type="Marker3D" parent="SpawnPoints"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 20)
+
+[node name="ZombieWaveSpawner" type="Node3D" parent="."]
+script = ExtResource("3_wave_spawner")
+zombie_scene = ExtResource("4_zombie_scene")
+initial_delay = 6.0
+time_between_waves = 5.0
+first_wave_size = 4
+wave_growth = 2
+max_alive_zombies = 24
+
+[node name="Enemy01" type="CharacterBody3D" parent="Enemies"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -18)
+script = ExtResource("2_enemy")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Enemies/Enemy01"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("CapsuleShape3D_enemy_body")
+
+[node name="Body" type="MeshInstance3D" parent="Enemies/Enemy01"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+mesh = SubResource("CapsuleMesh_enemy_body")
+material_override = SubResource("StandardMaterial3D_enemy")
+
+[node name="Enemy02" type="CharacterBody3D" parent="Enemies"]
+transform = Transform3D(0.965926, 0, -0.258819, 0, 1, 0, 0.258819, 0, 0.965926, -4, 0, -24)
+script = ExtResource("2_enemy")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Enemies/Enemy02"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("CapsuleShape3D_enemy_body")
+
+[node name="Body" type="MeshInstance3D" parent="Enemies/Enemy02"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+mesh = SubResource("CapsuleMesh_enemy_body")
+material_override = SubResource("StandardMaterial3D_enemy")
+
+[node name="Enemy03" type="CharacterBody3D" parent="Enemies"]
+transform = Transform3D(0.984808, 0, 0.173648, 0, 1, 0, -0.173648, 0, 0.984808, 4, 0, -28)
+script = ExtResource("2_enemy")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Enemies/Enemy03"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("CapsuleShape3D_enemy_body")
+
+[node name="Body" type="MeshInstance3D" parent="Enemies/Enemy03"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+mesh = SubResource("CapsuleMesh_enemy_body")
+material_override = SubResource("StandardMaterial3D_enemy")
+
+[node name="Enemy04" type="CharacterBody3D" parent="Enemies"]
+transform = Transform3D(0.939693, 0, -0.34202, 0, 1, 0, 0.34202, 0, 0.939693, -8, 0, -34)
+script = ExtResource("2_enemy")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Enemies/Enemy04"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("CapsuleShape3D_enemy_body")
+
+[node name="Body" type="MeshInstance3D" parent="Enemies/Enemy04"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+mesh = SubResource("CapsuleMesh_enemy_body")
+material_override = SubResource("StandardMaterial3D_enemy")
+
+[node name="Enemy05" type="CharacterBody3D" parent="Enemies"]
+transform = Transform3D(0.965926, 0, 0.258819, 0, 1, 0, -0.258819, 0, 0.965926, 9, 0, -39)
+script = ExtResource("2_enemy")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Enemies/Enemy05"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("CapsuleShape3D_enemy_body")
+
+[node name="Body" type="MeshInstance3D" parent="Enemies/Enemy05"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+mesh = SubResource("CapsuleMesh_enemy_body")
+material_override = SubResource("StandardMaterial3D_enemy")
+
+[node name="Player" type="CharacterBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+script = ExtResource("1_player")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Player"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("CapsuleShape3D_player")
+
+[node name="Head" type="Node3D" parent="Player"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.35, 0)
+
+[node name="OuchAudio" type="AudioStreamPlayer" parent="Player"]
+volume_db = -3.0
+
+[node name="WalkingAudio" type="AudioStreamPlayer" parent="Player"]
+volume_db = -10.0
+
+[node name="DamageFlash" type="CanvasLayer" parent="Player"]
+
+[node name="ColorRect" type="ColorRect" parent="Player/DamageFlash"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.85, 0.05, 0.05, 0)
+
+[node name="HUD" type="CanvasLayer" parent="Player"]
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Player/HUD"]
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 340.0
+offset_bottom = 150.0
+theme_override_constants/separation = 8
+
+[node name="ScoreLabel" type="Label" parent="Player/HUD/VBoxContainer"]
+text = "Score: 0"
+
+[node name="EnergyLabel" type="Label" parent="Player/HUD/VBoxContainer"]
+text = "Energy: 100%"
+
+[node name="EnergyBar" type="ProgressBar" parent="Player/HUD/VBoxContainer"]
+custom_minimum_size = Vector2(260, 16)
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="GameOverLabel" type="Label" parent="Player/HUD"]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -210.0
+offset_top = -30.0
+offset_right = 210.0
+offset_bottom = 30.0
+theme_override_font_sizes/font_size = 48
+horizontal_alignment = 1
+vertical_alignment = 1
+text = "GAME OVER"
+
+[node name="Camera3D" type="Camera3D" parent="Player/Head"]
+current = true
+fov = 75.0
+
+[node name="Flashlight" type="SpotLight3D" parent="Player/Head/Camera3D"]
+transform = Transform3D(1, 0, 0, 0, 0.999391, 0.0348995, 0, -0.0348995, 0.999391, 0, -0.04, -0.08)
+visible = false
+light_energy = 3.2
+spot_range = 30.0
+spot_angle = 34.0
+spot_angle_attenuation = 0.65
+shadow_enabled = true
+
+[node name="GunRoot" type="Node3D" parent="Player/Head/Camera3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.24, -0.22, -0.5)
+
+[node name="GunBody" type="MeshInstance3D" parent="Player/Head/Camera3D/GunRoot"]
+mesh = SubResource("BoxMesh_gun_body")
+material_override = SubResource("StandardMaterial3D_gun")
+
+[node name="GunSlide" type="MeshInstance3D" parent="Player/Head/Camera3D/GunRoot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.048, -0.02)
+mesh = SubResource("BoxMesh_gun_slide")
+material_override = SubResource("StandardMaterial3D_gun")
+
+[node name="GunBarrel" type="MeshInstance3D" parent="Player/Head/Camera3D/GunRoot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.015, -0.255)
+mesh = SubResource("BoxMesh_gun_barrel")
+material_override = SubResource("StandardMaterial3D_gun")
+
+[node name="GunGrip" type="MeshInstance3D" parent="Player/Head/Camera3D/GunRoot"]
+transform = Transform3D(0.961262, -0.275637, 0, 0.275637, 0.961262, 0, 0, 0, 1, 0, -0.095, 0.085)
+mesh = SubResource("BoxMesh_gun_grip")
+material_override = SubResource("StandardMaterial3D_gun_polymer")
+
+[node name="RearSight" type="MeshInstance3D" parent="Player/Head/Camera3D/GunRoot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.09, 0.045)
+mesh = SubResource("BoxMesh_gun_sight")
+material_override = SubResource("StandardMaterial3D_gun")
+
+[node name="FrontSight" type="MeshInstance3D" parent="Player/Head/Camera3D/GunRoot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.085, -0.245)
+mesh = SubResource("BoxMesh_gun_sight")
+material_override = SubResource("StandardMaterial3D_gun")
+
+[node name="Muzzle" type="Marker3D" parent="Player/Head/Camera3D/GunRoot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.015, -0.36)
+
+[node name="GunShotAudio" type="AudioStreamPlayer3D" parent="Player/Head/Camera3D/GunRoot"]
+unit_size = 4.0
+max_distance = 40.0
+attenuation_filter_cutoff_hz = 6000.0
+
+[node name="ReloadAudio" type="AudioStreamPlayer3D" parent="Player/Head/Camera3D/GunRoot"]
+unit_size = 4.0
+max_distance = 28.0
+attenuation_filter_cutoff_hz = 5500.0

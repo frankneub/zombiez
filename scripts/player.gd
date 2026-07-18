@@ -20,6 +20,7 @@ const WALKING_STREAM_PATH: String = "res://assets/audio/Walking.ogg"
 @export var flashlight_starts_on: bool = true
 @export var max_energy: float = 100.0
 @export var zombie_collision_energy_loss_percent: float = 10.0
+@export var web_audio_js_fallback_enabled: bool = true
 
 @onready var head: Node3D = $Head
 @onready var camera: Camera3D = $Head/Camera3D
@@ -134,11 +135,13 @@ func play_ouch_sound() -> void:
 		ouch_audio.stream = load_audio_stream(OUCH_STREAM_PATH)
 		if ouch_audio.stream == null:
 			play_synth_on_player_2d(ouch_audio, 0.12, 210.0, 0.24)
+			play_web_tone_fallback(210.0, 0.12, 0.05)
 			return
 		
 	ouch_audio.pitch_scale = randf_range(0.97, 1.03)
 	ouch_audio.volume_db = -3.0
 	ouch_audio.play()
+	play_web_tone_fallback(210.0, 0.12, 0.03)
 
 
 func play_damage_flash() -> void:
@@ -371,10 +374,12 @@ func play_shot_sound() -> void:
 		gun_shot_audio.stream = load_audio_stream(GUNSHOT_STREAM_PATH)
 		if gun_shot_audio.stream == null:
 			play_synth_on_player_3d(gun_shot_audio, 0.11, 175.0, 0.26)
+			play_web_tone_fallback(180.0, 0.10, 0.08)
 			return
 	gun_shot_audio.pitch_scale = randf_range(0.98, 1.03)
 	gun_shot_audio.volume_db = -2.0
 	gun_shot_audio.play()
+	play_web_tone_fallback(180.0, 0.10, 0.04)
 
 
 func play_reload_sound() -> void:
@@ -384,10 +389,45 @@ func play_reload_sound() -> void:
 		reload_audio.stream = load_audio_stream(RELOAD_STREAM_PATH)
 		if reload_audio.stream == null:
 			play_synth_on_player_3d(reload_audio, 0.18, 125.0, 0.2)
+			play_web_tone_fallback(125.0, 0.16, 0.05)
 			return
 	reload_audio.pitch_scale = randf_range(0.98, 1.02)
 	reload_audio.volume_db = -4.0
 	reload_audio.play()
+	play_web_tone_fallback(125.0, 0.16, 0.03)
+
+
+func play_web_tone_fallback(frequency: float, duration: float, volume: float) -> void:
+	if not web_audio_js_fallback_enabled:
+		return
+	if not OS.has_feature("web"):
+		return
+
+	var js := """
+		(() => {
+			const Ctor = window.AudioContext || window.webkitAudioContext;
+			if (!Ctor) return;
+			const ctx = window.__zombiezAudioCtx || new Ctor();
+			window.__zombiezAudioCtx = ctx;
+			if (ctx.state === 'suspended') ctx.resume();
+			const osc = ctx.createOscillator();
+			const gain = ctx.createGain();
+			osc.type = 'triangle';
+			osc.frequency.value = __FREQ__;
+			gain.gain.value = __VOL__;
+			osc.connect(gain);
+			gain.connect(ctx.destination);
+			const now = ctx.currentTime;
+			gain.gain.setValueAtTime(__VOL__, now);
+			gain.gain.exponentialRampToValueAtTime(0.0001, now + __DUR__);
+			osc.start(now);
+			osc.stop(now + __DUR__);
+		})();
+	"""
+	js = js.replace("__FREQ__", str(frequency))
+	js = js.replace("__DUR__", str(duration))
+	js = js.replace("__VOL__", str(volume))
+	JavaScriptBridge.eval(js)
 
 
 func play_synth_on_player_2d(player: AudioStreamPlayer, duration: float, frequency: float, gain: float) -> void:

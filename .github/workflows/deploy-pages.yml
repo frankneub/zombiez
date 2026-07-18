@@ -26,6 +26,7 @@ jobs:
         uses: actions/configure-pages@v5
 
       - name: Export Godot Web build
+        id: export
         uses: firebelley/godot-export@v6.0.0
         with:
           godot_executable_download_url: https://github.com/godotengine/godot/releases/download/4.7-stable/Godot_v4.7-stable_linux.x86_64.zip
@@ -36,13 +37,13 @@ jobs:
 
       - name: Verify web export output
         run: |
-          ls -la build/Web
-          test -f build/Web/index.html
+          ls -la "${{ steps.export.outputs.build_directory }}/Web"
+          test -f "${{ steps.export.outputs.build_directory }}/Web/index.html"
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: build/Web
+          path: ${{ steps.export.outputs.build_directory }}/Web
 
   deploy:
     runs-on: ubuntu-latest

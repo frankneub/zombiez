@@ -50,6 +50,7 @@ var flashlight_enabled: bool = false
 var score: int = 0
 var current_energy: float = 0.0
 var is_game_over: bool = false
+var web_audio_unlocked: bool = false
 
 func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
@@ -148,6 +149,8 @@ func respawn() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	try_unlock_web_audio(event)
+
 	if is_game_over:
 		return
 
@@ -175,6 +178,45 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F:
 		toggle_flashlight()
+
+
+func try_unlock_web_audio(event: InputEvent) -> void:
+	if web_audio_unlocked:
+		return
+	if not OS.has_feature("web"):
+		web_audio_unlocked = true
+		return
+
+	var is_user_gesture: bool = false
+	if event is InputEventMouseButton:
+		is_user_gesture = event.pressed
+	elif event is InputEventKey:
+		is_user_gesture = event.pressed and not event.echo
+
+	if not is_user_gesture:
+		return
+
+	# Some browsers keep WebAudio suspended until explicit interaction.
+	JavaScriptBridge.eval("""
+		(() => {
+			const Ctor = window.AudioContext || window.webkitAudioContext;
+			if (!Ctor) return;
+			const ctx = window.__godotAudioUnlockCtx || new Ctor();
+			window.__godotAudioUnlockCtx = ctx;
+			if (ctx.state === 'suspended') {
+				ctx.resume();
+			}
+			const osc = ctx.createOscillator();
+			const gain = ctx.createGain();
+			gain.gain.value = 0.0001;
+			osc.connect(gain);
+			gain.connect(ctx.destination);
+			osc.start();
+			osc.stop(ctx.currentTime + 0.02);
+		})();
+	""")
+
+	web_audio_unlocked = true
 
 
 func apply_zombie_collision_hit(attacker_position: Vector3 = Vector3.ZERO) -> void:

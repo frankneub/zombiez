@@ -84,12 +84,13 @@ func _ready() -> void:
 
 
 func load_audio_stream(path: String) -> AudioStream:
-	if path.get_extension().to_lower() == "ogg":
-		return AudioStreamOggVorbis.load_from_file(path)
-
 	var loaded_resource: Resource = load(path)
 	if loaded_resource is AudioStream:
 		return loaded_resource as AudioStream
+
+	# Web export cannot always access packed resources via load_from_file.
+	if path.get_extension().to_lower() == "ogg":
+		return AudioStreamOggVorbis.load_from_file(path)
 
 	return null
 
